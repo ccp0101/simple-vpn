@@ -29,7 +29,7 @@ class TUNDevice(Device):
 
     def open_tun(self, path):
         mode = self.IFF_TUN | self.IFF_NO_PI
-        tun = open(path, "rw+b")
+        tun = open(path, "rw")
         if "linux" in sys.platform:
             ifs = ioctl(tun, self.TUNSETIFF, struct.pack("16sH", self.IFNAME_PREFIX + "%d", mode))
             ifname = ifs[:16].strip("\x00")
@@ -47,7 +47,7 @@ class TUNDevice(Device):
                     self.fd, self.ifname = self.open_tun(path)
                     opened_path = path
                     break
-                except OSError as e:
+                except IOError as e:
                     self.logger.debug(str(e))
         else:
             path = "/dev/net/tun"
@@ -83,8 +83,12 @@ class TUNDevice(Device):
     def on_read(self, fd, events):
         payload = self.fd.read(self.MAX_BUF_SIZE)
         p = Packet(payload, source=self)
-        self.logger.debug("received: %s" % str(p))
+        self.logger.debug("read: %s" % str(p))
         self.apply_packet_callback(p)
+
+    def send_packet(self, pkt):
+        self.fd.write(pkt.payload)
+        self.logger.debug("wrote: %s" % str(pkt))
 
 
 class TUNDeviceManager(DeviceManager):

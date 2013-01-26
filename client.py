@@ -6,7 +6,7 @@ if __name__ == "__main__":
             "port": 20123,
         },
         "link": {
-            "port": 80,
+            "port": 20124,
             "host": "127.0.0.1",
         },
         "hooks": {

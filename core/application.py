@@ -4,25 +4,31 @@ import argparse
 import logging
 import json
 import tornado.ioloop
-from links.tcp import TCPLinkClientManager
+from links.tcp import TCPLinkClientManager, TCPLinkServerManager
 # from devices.bsd import DivertSocketDeviceManager
 from devices.tun import TUNDeviceManager
 from session import Session
 import tornado.gen
 import uuid
+from datetime import timedelta
 
 
 class Application(object):
     def __init__(self, mode, config):
-        logging.basicConfig(level=logging.DEBUG)
+        format = "%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d\t%(message)s"
+        logging.basicConfig(level=logging.DEBUG, format=format)
         self.logger = logging.getLogger("app")
         self.io_loop = tornado.ioloop.IOLoop(impl=tornado.ioloop._Select())
         self.io_loop.install()
         self.mode = mode
         self.config = config
         self.session = None
-        self.link_manager = TCPLinkClientManager(self.config['link'])
-        self.device_manager = TUNDeviceManager(self.config['device'])
+        if self.mode == "client":
+            self.link_manager = TCPLinkClientManager(self.config['link'])
+            self.device_manager = TUNDeviceManager(self.config['device'])
+        else:
+            self.link_manager = TCPLinkServerManager(self.config['link'])
+            self.device_manager = TUNDeviceManager(self.config['device'])
         self.sessions = []
 
     def _run(self):
@@ -40,10 +46,12 @@ class Application(object):
     @tornado.gen.engine
     def add_new_session(self):
         if len(self.sessions) < self.max_session_size:
-            link = yield tornado.gen.Task(self.link_manager.create)
+            link = None
+            while link is None:
+                link = yield tornado.gen.Task(self.link_manager.create)
+                yield tornado.gen.Task(self.io_loop.add_timeout, timedelta(seconds=1))
             link.setup()
             device = yield tornado.gen.Task(self.device_manager.create)
-            device.setup()
 
             session = Session(self.config, device, link, name=self.session_name)
             session.setup(self.session_closed)

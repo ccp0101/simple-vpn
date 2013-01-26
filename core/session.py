@@ -23,6 +23,8 @@ class Session(object):
 
     def on_finish_setup(self):
         self.logger.info("session initiated!")
+        self.device.setup()
+        self.logger.info("device initiated!")
         hook = self.config.get("hooks", {}).get("start", None)
         if hook:
             self.run_os_command(hook)

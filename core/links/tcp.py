@@ -6,7 +6,7 @@ import struct
 import tornado.gen
 import logging
 import socket
-import tornado.gen
+import tornado.netutil
 import tornado.ioloop
 from datetime import timedelta
 
@@ -36,12 +36,12 @@ class TCPLink(Link):
         self.logger.debug("establishing session link.")
 
         # add a close timeout in case server does not respond
-        self.io_loop.add_timeout(timedelta(seconds=5), self.apply_close_callback)
+        handle = self.io_loop.add_timeout(timedelta(seconds=5), self.apply_close_callback)
 
         data = yield tornado.gen.Task(self.stream.read_bytes, 4)
-        self.io_loop.remove_callback(self.apply_close_callback)
+        self.io_loop.remove_timeout(handle)
 
-        word = struct.unpack("!L", data)
+        word, = struct.unpack("!L", data)
         if word != self.MAGIC_WORD:
             self.logger.debug("received wrong magic word: 0x%X" % word)
             self.stream.close()
@@ -49,6 +49,7 @@ class TCPLink(Link):
         else:
             self.logger.debug("received correct magic word: 0x%X" % word)
             callback()
+            self.io_loop.add_callback(self.wait_packet)
 
     def cleanup(self):
         self.callback = None
@@ -61,13 +62,10 @@ class TCPLink(Link):
         self.stream.write(packet.serialize())
         self.logger.debug("sent: %s" % str(packet))
 
-    def on_connect(self):
-        pass
-
     def on_close(self):
         if self.stream.error:
-            logging.error("error in connection to (%s:%d): " % (self.config['host'],
-                self.config['port']) + str(self.stream.error))
+            logging.error("error in connection to (%s:%d): " % self.dest +
+                str(self.stream.error))
         self.apply_close_callback()
 
     def send_magic_word(self):
@@ -76,7 +74,8 @@ class TCPLink(Link):
 
     @tornado.gen.engine
     def wait_packet(self):
-        length = yield tornado.gen.Task(self.stream.read_bytes, 2)
+        data = yield tornado.gen.Task(self.stream.read_bytes, 2)
+        length, = struct.unpack("!H", data)
         payload = yield tornado.gen.Task(self.stream.read_bytes, length)
         pkt = Packet(payload, source=self)
         self.apply_packet_callback(pkt)
@@ -116,3 +115,28 @@ class TCPLinkClientManager(object):
 
     def cleanup(self):
         self.stream = None
+
+
+class TCPLinkServerManager(object):
+    def __init__(self, config):
+        self.config = config
+        self.stream = None
+        self.creation_callback = None
+
+    def setup(self):
+        class Server(tornado.netutil.TCPServer):
+            def handle_stream(self, stream, address):
+                if getattr(self, "creation_callback", None):
+                    self.creation_callback(TCPLink(stream))
+                    self.creation_callback = None
+                else:
+                    stream.close()
+        self.server = Server()
+        self.server.bind(self.config['port'], address='0.0.0.0')
+        self.server.start(1)
+
+    def create(self, callback):
+        self.server.creation_callback = callback
+
+    def cleanup(self):
+        self.server.stop()
