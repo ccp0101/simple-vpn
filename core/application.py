@@ -15,7 +15,7 @@ from datetime import timedelta
 
 class Application(object):
     def __init__(self, mode, config):
-        format = "%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d\t%(message)s"
+        format = "%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d\t%(name)s\t%(message)s"
         logging.basicConfig(level=logging.DEBUG, format=format)
         self.logger = logging.getLogger("app")
         self.io_loop = tornado.ioloop.IOLoop(impl=tornado.ioloop._Select())

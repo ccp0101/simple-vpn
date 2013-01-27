@@ -37,7 +37,6 @@ class TCPLink(Link):
 
         # add a close timeout in case server does not respond
         handle = self.io_loop.add_timeout(timedelta(seconds=5), self.apply_close_callback)
-
         data = yield tornado.gen.Task(self.stream.read_bytes, 4)
         self.io_loop.remove_timeout(handle)
 
@@ -63,6 +62,7 @@ class TCPLink(Link):
         self.logger.debug("sent: %s" % str(packet))
 
     def on_close(self):
+        self.connected = False
         if self.stream.error:
             logging.error("error in connection to (%s:%d): " % self.dest +
                 str(self.stream.error))
@@ -78,7 +78,9 @@ class TCPLink(Link):
         length, = struct.unpack("!H", data)
         payload = yield tornado.gen.Task(self.stream.read_bytes, length)
         pkt = Packet(payload, source=self)
+        self.logger.debug("received: " + str(pkt))
         self.apply_packet_callback(pkt)
+        self.io_loop.add_callback(self.wait_packet)
 
 
 class TCPLinkClientManager(object):

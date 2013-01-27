@@ -21,15 +21,19 @@ class TUNDevice(Device):
         self.io_loop = io_loop or tornado.ioloop.IOLoop.instance()
         self.callback = None
         self.fd = None
-        self.logger = logging.getLogger(str(self))
+        self.ifname = None
+        self.setup_logger()
         self.logger.debug("created.")
 
+    def setup_logger(self):
+        self.logger = logging.getLogger(str(self))
+
     def __str__(self):
-        return "tun"
+        return "ifname<%s>" % self.ifname if self.ifname else "tun"
 
     def open_tun(self, path):
         mode = self.IFF_TUN | self.IFF_NO_PI
-        tun = open(path, "rw")
+        tun = open(path, "r+b")
         if "linux" in sys.platform:
             ifs = ioctl(tun, self.TUNSETIFF, struct.pack("16sH", self.IFNAME_PREFIX + "%d", mode))
             ifname = ifs[:16].strip("\x00")
@@ -58,6 +62,7 @@ class TUNDevice(Device):
             except OSError as e:
                 self.logger.debug(str(e))
         if opened_path:
+            self.setup_logger()
             """
             Hack Tornado so that ERROR event is not automatically added, equal to:
 

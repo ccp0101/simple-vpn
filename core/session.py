@@ -22,7 +22,6 @@ class Session(object):
         self.link.establish(self.on_finish_setup)
 
     def on_finish_setup(self):
-        self.logger.info("session initiated!")
         self.device.setup()
         self.logger.info("device initiated!")
         hook = self.config.get("hooks", {}).get("start", None)
@@ -30,6 +29,7 @@ class Session(object):
             self.run_os_command(hook)
         self.device.set_packet_callback(self.on_device_packet)
         self.link.set_packet_callback(self.on_link_packet)
+        self.logger.info("session initiated!")
 
     def run_os_command(self, command, raise_error=False):
         ret = -1

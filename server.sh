@@ -1,1 +1,1 @@
-sudo iptables -t nat -I POSTROUTING -s 10.0.0.0/8 -j MASQUERADE
+sudo ifconfig tun0 10.4.0.5 pointopoint 10.4.0.6 up
