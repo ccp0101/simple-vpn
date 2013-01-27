@@ -97,7 +97,7 @@ class TUNDevice(Device):
     def send_packet(self, pkt):
         header = ""
         if "linux" in sys.platform:
-            header = struct("!BBBB", 0x00, 0x00, 0x08, 0x00)
+            header = struct.pack("!BBBB", 0x00, 0x00, 0x08, 0x00)
         payload = header + pkt.payload
         os.write(self.fd, payload)
         self.logger.debug("wrote: %s" % str(pkt))
