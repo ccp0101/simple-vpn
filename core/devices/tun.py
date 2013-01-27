@@ -15,7 +15,7 @@ class TUNDevice(Device):
     IFF_TAP = 0x0002
     IFF_NO_PI = 0x1000
     MAX_BUF_SIZE = 2048
-    IFNAME_PREFIX = "tun"
+    IFNAME_PREFIX = "vpn"
 
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or tornado.ioloop.IOLoop.instance()
@@ -87,20 +87,14 @@ class TUNDevice(Device):
 
     def on_read(self, fd, events):
         payload = os.read(self.fd, self.MAX_BUF_SIZE)
-        if "linux" in sys.platform:
-            payload = payload[4:]
         print hexdump(payload)
         p = Packet(payload, source=self)
         self.logger.debug("read: %s" % str(p))
         self.apply_packet_callback(p)
 
     def send_packet(self, pkt):
-        header = ""
-        if "linux" in sys.platform:
-            header = struct.pack("!BBBB", 0x00, 0x00, 0x08, 0x00)
-        payload = header + pkt.payload
-        print hexdump(payload)
-        os.write(self.fd, payload)
+        print hexdump(pkt.payload)
+        os.write(self.fd, pkt.payload)
         self.logger.debug("wrote: %s" % str(pkt))
 
 
