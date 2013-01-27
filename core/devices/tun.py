@@ -89,19 +89,19 @@ class TUNDevice(Device):
         payload = os.read(self.fd, self.MAX_BUF_SIZE)
         if "linux" in sys.platform:
             payload = payload[4:]
+        print hexdump(payload)
         p = Packet(payload, source=self)
         self.logger.debug("read: %s" % str(p))
         self.apply_packet_callback(p)
-        print hexdump(payload)
 
     def send_packet(self, pkt):
         header = ""
         if "linux" in sys.platform:
             header = struct.pack("!BBBB", 0x00, 0x00, 0x08, 0x00)
         payload = header + pkt.payload
+        print hexdump(payload)
         os.write(self.fd, payload)
         self.logger.debug("wrote: %s" % str(pkt))
-        print hexdump(payload)
 
 
 class TUNDeviceManager(DeviceManager):
