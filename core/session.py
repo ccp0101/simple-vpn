@@ -19,9 +19,6 @@ class Session(object):
     def setup(self, close_callback):
         real_callback = functools.partial(close_callback, self)
         self.link.set_close_callback(real_callback)
-        self.link.establish(self.on_finish_setup)
-
-    def on_finish_setup(self):
         self.device.setup()
         self.logger.info("device initiated!")
         hook = self.config.get("hooks", {}).get("start", None)

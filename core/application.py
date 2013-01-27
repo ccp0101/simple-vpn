@@ -49,13 +49,11 @@ class Application(object):
             link = None
             while link is None:
                 link = yield tornado.gen.Task(self.link_manager.create)
-                yield tornado.gen.Task(self.io_loop.add_timeout, timedelta(seconds=1))
-            link.setup()
             device = yield tornado.gen.Task(self.device_manager.create)
 
             session = Session(self.config, device, link, name=self.session_name)
-            session.setup(self.session_closed)
             self.sessions.append(session)
+            session.setup(self.session_closed)
             self.add_new_session()
 
     def session_closed(self, session):

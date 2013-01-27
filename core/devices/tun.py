@@ -1,7 +1,7 @@
 from .abstract import Device, DeviceManager
 from ..networking.packet import Packet
 from fcntl import ioctl
-from ..utils import Error
+from ..utils import Error, hexdump
 import struct
 import tornado.ioloop
 import logging
@@ -33,7 +33,7 @@ class TUNDevice(Device):
 
     def open_tun(self, path):
         mode = self.IFF_TUN | self.IFF_NO_PI
-        tun = open(path, "r+b")
+        tun = os.open(path, os.O_RDWR)
         if "linux" in sys.platform:
             ifs = ioctl(tun, self.TUNSETIFF, struct.pack("16sH", self.IFNAME_PREFIX + "%d", mode))
             ifname = ifs[:16].strip("\x00")
@@ -51,7 +51,7 @@ class TUNDevice(Device):
                     self.fd, self.ifname = self.open_tun(path)
                     opened_path = path
                     break
-                except IOError as e:
+                except OSError as e:
                     self.logger.debug(str(e))
         else:
             path = "/dev/net/tun"
@@ -72,7 +72,7 @@ class TUNDevice(Device):
             self.logger.info("opened " + opened_path)
             error_event = self.io_loop.ERROR
             self.io_loop.ERROR = 0
-            self.io_loop.add_handler(self.fd.fileno(), self.on_read, self.io_loop.READ)
+            self.io_loop.add_handler(self.fd, self.on_read, self.io_loop.READ)
             self.io_loop.ERROR = error_event
         else:
             self.fd = None
@@ -81,19 +81,21 @@ class TUNDevice(Device):
     def cleanup(self):
         if self.fd:
             self.logger.info("closing tun device.")
-            self.io_loop.remove_handler(self.fd.fileno())
-            self.fd.close()
+            self.io_loop.remove_handler(self.fd)
+            os.close(self.fd)
         self.fd = None
 
     def on_read(self, fd, events):
-        payload = self.fd.read(self.MAX_BUF_SIZE)
+        payload = os.read(self.fd, self.MAX_BUF_SIZE)
         p = Packet(payload, source=self)
         self.logger.debug("read: %s" % str(p))
         self.apply_packet_callback(p)
+        print hexdump(payload)
 
     def send_packet(self, pkt):
-        self.fd.write(pkt.payload)
+        os.write(self.fd, pkt.payload)
         self.logger.debug("wrote: %s" % str(pkt))
+        print hexdump(pkt.payload)
 
 
 class TUNDeviceManager(DeviceManager):
