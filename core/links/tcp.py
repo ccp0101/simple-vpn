@@ -70,7 +70,7 @@ class TCPLink(Link):
         self.logger.debug("sent: %s" % str(packet))
 
     def send_message(self, msg):
-        serialized = json.dumps(msg)
+        serialized = bytes(json.dumps(msg))
         self.stream.write(struct.pack("!BL", self.CONTROL_MESSAGE_IDENTIFIER,
             len(serialized)) + serialized)
         self.logger.debug("sent message: " + str(msg))

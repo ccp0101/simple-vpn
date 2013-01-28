@@ -45,11 +45,11 @@ class Session(object):
         self.logger.debug("created.")
 
     def setup(self, close_callback):
+        self.link.set_message_callback(self.on_message)
         real_callback = functools.partial(close_callback, self)
         self.link.set_close_callback(real_callback)
         self.device.setup()
         self.logger.info("device initiated!")
-        self.link.set_message_callback(self.on_message)
 
         if self.mode == "server":
             self.ip_manager = IPAddressSpaceManager(self.config['network'])

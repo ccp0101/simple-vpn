@@ -25,7 +25,7 @@ class Application(object):
         self.session = None
         if self.mode == "client":
             self.link_manager = TCPLinkClientManager(self.config['link'])
-            self.device_manager = DivertSocketDeviceManager(self.config['device'])
+            self.device_manager = TUNDeviceManager(self.config['device'])
         else:
             self.link_manager = TCPLinkServerManager(self.config['link'])
             self.device_manager = TUNDeviceManager(self.config['device'])
@@ -48,8 +48,8 @@ class Application(object):
         if len(self.sessions) < self.max_session_size:
             link = None
             while link is None:
-                link = yield tornado.gen.Task(self.link_manager.create)
                 yield tornado.gen.Task(self.io_loop.add_timeout, timedelta(seconds=1))
+                link = yield tornado.gen.Task(self.link_manager.create)
 
             device = yield tornado.gen.Task(self.device_manager.create)
 

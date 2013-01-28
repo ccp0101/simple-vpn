@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import sys
 
 
 # used for port validation. returns True if valid.
@@ -24,18 +25,30 @@ def hexdump(src, length=8):
     return b'\n'.join(result)
 
 
-def get_default_route():
+def get_route(addr):
     """
-    Executes a system command to retrieve default route, and returns (gateway_ip, gateway_ifname)
+    Executes a system command to retrieve the route for specific address
+    @returns (gateway_ip, gateway_ifname)
+    For Linux: ip route get <address>
+    For Mac: route get <address>
     """
-    command = "netstat -nr | grep '^default'"
+    if "darwin" in sys.platform:
+        command = "/sbin/route get " + addr
+    else:
+        command = "/sbin/ip route get " + addr
     try:
         out = subprocess.check_output(command, shell=True)
     except subprocess.CalledProcessError as e:
         logging.warning("\"%s\" returned %d" % (command, e.returncode))
         return ('', '')
-    comps = out.strip().split()
-    return (comps[1], comps[5])
+
+    if "darwin" in sys.platform:
+        lines = filter(lambda x: ":" in x, out.splitlines())
+        mapped = dict(map(lambda x: tuple(x.replace(" ", "").split(":")), lines))
+        return (mapped.get('gateway', ''), mapped.get('interface', ''))
+    else:
+        comps = out.strip().split()
+        return (comps[2], comps[4])
 
 
 def run_os_command(command, params=[], supress_error=True):

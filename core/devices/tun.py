@@ -1,13 +1,12 @@
 from .abstract import Device, DeviceManager
 from ..networking.packet import Packet
 from fcntl import ioctl
-from ..utils import Error, hexdump, run_os_command, get_default_route
+from ..utils import Error, hexdump, run_os_command, get_route
 import struct
 import tornado.ioloop
 import logging
 import sys
 import os.path
-import functools
 
 
 class TUNDevice(Device):
@@ -108,7 +107,7 @@ class TUNDevice(Device):
 
     def modify_route(self, network, netmask, gateway_ip, gateway_ifname, operation="add"):
         if "darwin" in sys.platform:
-            run_os_command("/sbin/route %s -net %s %s %s" (operation, network, gateway_ip, netmask))
+            run_os_command("/sbin/route %s -net %s %s %s" % (operation, network, gateway_ip, netmask))
         else:
             run_os_command("/sbin/route %s -net %s netmask %s gw %s dev %s" %
                 (operation, network, netmask, gateway_ip, gateway_ifname))
@@ -119,14 +118,14 @@ class TUNDevice(Device):
 
     def restore_routes(self):
         for route in self.added_routes:
-            self.modify_route(*route, operation="del")
+            self.modify_route(*route, operation="delete")
         self.added_routes = []
 
     def configure_network(self, server_public_ip, server_private_ip=None, client_private_ip=None,
             add_routes=False):
         self.interface_up(self.ifname, client_private_ip, server_private_ip)
         if add_routes:
-            self.gw_ip, self.gw_ifname = get_default_route()
+            self.gw_ip, self.gw_ifname = get_route(server_public_ip)
             self.add_route(server_public_ip, '255.255.255.255', self.gw_ip, self.gw_ifname)
             self.add_route('0.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
             self.add_route('128.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
