@@ -7,9 +7,6 @@ if __name__ == "__main__":
         "link": {
             "port": 20124,
         },
-        "hooks": {
-            "start": "/Users/ccp/code/simple-vpn/server.sh",
-        },
         "network": "10.48.0.0/24"
         })
     app.run()

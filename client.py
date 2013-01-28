@@ -3,7 +3,6 @@ from core.application import Application
 if __name__ == "__main__":
     app = Application("client", {
         "device": {
-            "port": 20123,
         },
         "link": {
             "port": 20124,
@@ -11,9 +10,5 @@ if __name__ == "__main__":
             # "host": "10.0.2.17",
             "host": "143.89.220.80",
         },
-        "hooks": {
-            "start": "/Users/ccp/code/simple-vpn/start.sh",
-            "stop": "/Users/ccp/code/simple-vpn/stop.sh"
-        }
         })
     app.run()

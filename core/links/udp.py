@@ -151,7 +151,7 @@ class UDPLinkClientManager(object):
 
         self.socket.sendto(struct.pack("!L", UDP_MAGIC_WORD), addr)
 
-        self.logging.debug("sent initialial message.")
+        self.logger.debug("sent initialial message.")
         data, peer = yield tornado.gen.Task(read_packet, self.socket)
         if data == RESET_PACKET:
             callback(None)
@@ -169,6 +169,10 @@ class UDPLinkClientManager(object):
                 self.logger.info("received incorrect magic word: 0x%X" % word)
                 self.socket.sendto(RESET_PACKET, peer)
                 callback(None)
+        else:
+            self.logger.info("received packet of wrong size.")
+            self.socket.sendto(RESET_PACKET, peer)
+            callback(None)
 
     def on_socket_read(self, fd, events):
         data, addr = self.socket.recvfrom(UDP_BUF_SIZE)
@@ -195,6 +199,8 @@ class UDPLinkServerManager(object):
     def setup(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('0.0.0.0', self.config['port']))
+        self.logger.info("listening for UDP packets on port %d" %
+            self.config['port'])
         self.io_loop.add_handler(self.socket.fileno(), self.on_socket_read,
             self.io_loop.READ)
 

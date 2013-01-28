@@ -37,11 +37,11 @@ class Application(object):
         self.config = config
         self.session = None
         if self.mode == "client":
-            self.link_manager = UDPLinkClientManager(self.config['link'])
-            self.device_manager = TUNDeviceManager(self.config['device'])
+            self.link_manager = UDPLinkClientManager(self.config.get('link', {}))
+            self.device_manager = TUNDeviceManager(self.config.get('device', {}))
         else:
-            self.link_manager = UDPLinkServerManager(self.config['link'])
-            self.device_manager = TUNDeviceManager(self.config['device'])
+            self.link_manager = UDPLinkServerManager(self.config.get('link', {}))
+            self.device_manager = TUNDeviceManager(self.config.get('device', {}))
         self.sessions = []
 
     def _run(self):
