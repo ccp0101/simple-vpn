@@ -99,10 +99,10 @@ class TUNDevice(Device):
 
     def interface_up(self, *args):
         if "darwin" in sys.platform:
-            run_os_command("/sbin/ifconfig %s %s %s mtu " + self.MTU +
+            run_os_command("/sbin/ifconfig %s %s %s mtu " + str(self.MTU) +
                 " netmask 255.255.255.255 up" % args)
         else:
-            run_os_command("/sbin/ifconfig %s %s pointtopoint %s mtu " + self.MTU +
+            run_os_command("/sbin/ifconfig %s %s pointtopoint %s mtu " + str(self.MTU) +
                 " up" % args)
 
     def interface_down(self, ifname):
