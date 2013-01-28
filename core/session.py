@@ -77,7 +77,10 @@ class Session(object):
             self.finalize_session()
 
     def configuration_parameters(self):
-        return (self.link.ip_endpoint, self.server_ip, self.client_ip)
+        if self.mode == "client":
+            return (self.link.ip_endpoint, self.server_ip, self.client_ip)
+        else:
+            return ("0.0.0.0", self.client_ip, self.server_ip)
 
     def finalize_session(self):
         self.logger.debug("configuring network.")
@@ -85,9 +88,6 @@ class Session(object):
             add_routes=(self.mode == "client"))
         self.network_configured = True
 
-        # hook = self.config.get("hooks", {}).get("start", None)
-        # if hook:
-        #     run_os_command(hook)
         self.device.set_packet_callback(self.on_device_packet)
         self.link.set_packet_callback(self.on_link_packet)
         self.logger.info("session initiated!")
@@ -101,9 +101,7 @@ class Session(object):
     def cleanup(self):
         if self.network_configured:
             self.device.restore_network(*self.configuration_parameters())
-        # hook = self.config.get("hooks", {}).get("stop", None)
-        # if hook:
-        #     self.run_os_command(hook)
+
         self.device.set_packet_callback(None)
         self.link.set_packet_callback(None)
         self.link.cleanup()
