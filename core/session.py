@@ -77,6 +77,7 @@ class Session(object):
             self.finalize_session()
 
     def configuration_parameters(self):
+        #  peer_pub_ip, peer_ip=None, my_ip=None
         if self.mode == "client":
             return (self.link.ip_endpoint, self.server_ip, self.client_ip)
         else:
@@ -85,7 +86,7 @@ class Session(object):
     def finalize_session(self):
         self.logger.debug("configuring network.")
         self.device.configure_network(*self.configuration_parameters(),
-            add_routes=(self.mode == "client"))
+            set_default_routes=(self.mode == "client"))
         self.network_configured = True
 
         self.device.set_packet_callback(self.on_device_packet)

@@ -40,3 +40,5 @@ sudo /sbin/ifconfig tun0 10.4.0.6 10.4.0.5 mtu 1500 netmask 255.255.255.255 up
 sudo /sbin/route add -net 173.212.221.150 10.4.0.5 255.255.255.255
 
 /sbin/ifconfig tun0 10.4.0.1 pointopoint 10.4.0.2 mtu 1500
+
+echo 1 > /proc/sys/net/ipv4/ip_forward

@@ -100,7 +100,7 @@ class TUNDevice(Device):
         if "darwin" in sys.platform:
             run_os_command("/sbin/ifconfig %s %s %s mtu 1500 netmask 255.255.255.255 up" % args)
         else:
-            run_os_command("/sbin/ifconfig %s %s pointtopoint %s mtu 1500" % args)
+            run_os_command("/sbin/ifconfig %s %s pointtopoint %s mtu 1500 up" % args)
 
     def interface_down(self, ifname):
         run_os_command("/sbin/ifconfig %s down" % ifname)
@@ -121,16 +121,17 @@ class TUNDevice(Device):
             self.modify_route(*route, operation="delete")
         self.added_routes = []
 
-    def configure_network(self, server_public_ip, server_private_ip=None, client_private_ip=None,
-            add_routes=False):
-        self.interface_up(self.ifname, client_private_ip, server_private_ip)
-        if add_routes:
-            self.gw_ip, self.gw_ifname = get_route(server_public_ip)
-            self.add_route(server_public_ip, '255.255.255.255', self.gw_ip, self.gw_ifname)
-            self.add_route('0.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
-            self.add_route('128.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
+    def configure_network(self, peer_pub_ip, peer_ip=None, my_ip=None,
+            set_default_routes=False):
+        self.interface_up(self.ifname, my_ip, peer_ip)
+        self.add_route(peer_ip, '255.255.255.255', peer_ip, self.ifname)
+        if set_default_routes:
+            self.gw_ip, self.gw_ifname = get_route(peer_pub_ip)
+            self.add_route(peer_pub_ip, '255.255.255.255', self.gw_ip, self.gw_ifname)
+            self.add_route('0.0.0.0', '128.0.0.0', peer_ip, self.ifname)
+            self.add_route('128.0.0.0', '128.0.0.0', peer_ip, self.ifname)
 
-    def restore_network(self, server_public_ip, server_private_ip=None, client_private_ip=None):
+    def restore_network(self, server_pub_ip, my_ip=None, peer_ip=None):
         self.interface_down(self.ifname)
         self.restore_routes()
 
