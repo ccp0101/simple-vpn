@@ -4,7 +4,8 @@ import argparse
 import logging
 import json
 import tornado.ioloop
-from links.tcp import TCPLinkClientManager, TCPLinkServerManager
+from links.udp import UDPLinkServerManager, UDPLinkClientManager
+# from links.tcp import TCPLinkClientManager, TCPLinkServerManager
 # from devices.bsd import DivertSocketDeviceManager
 from devices.tun import TUNDeviceManager
 from session import Session
@@ -24,10 +25,10 @@ class Application(object):
         self.config = config
         self.session = None
         if self.mode == "client":
-            self.link_manager = TCPLinkClientManager(self.config['link'])
+            self.link_manager = UDPLinkClientManager(self.config['link'])
             self.device_manager = TUNDeviceManager(self.config['device'])
         else:
-            self.link_manager = TCPLinkServerManager(self.config['link'])
+            self.link_manager = UDPLinkServerManager(self.config['link'])
             self.device_manager = TUNDeviceManager(self.config['device'])
         self.sessions = []
 

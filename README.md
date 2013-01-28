@@ -42,3 +42,7 @@ sudo /sbin/route add -net 173.212.221.150 10.4.0.5 255.255.255.255
 /sbin/ifconfig tun0 10.4.0.1 pointopoint 10.4.0.2 mtu 1500
 
 echo 1 > /proc/sys/net/ipv4/ip_forward
+
+
+sudo route -n add 10.48.0.2/32 gw 10.48.0.1
+iptables -t nat -I POSTROUTING -s 10.48.0.0/24 -j MASQUERADE

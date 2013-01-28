@@ -1,6 +1,9 @@
+import binascii
 import subprocess
 import logging
 import sys
+import os
+import tornado.ioloop
 
 
 # used for port validation. returns True if valid.
@@ -60,3 +63,25 @@ def run_os_command(command, params=[], supress_error=True):
         logging.warning("returned %d" % e.returncode)
         return e.returncode
     return 0
+
+
+def random_bytes(size):
+    return bytes(os.urandom(size))
+
+
+def hexify(data):
+    return binascii.b2a_hex(data)
+
+
+def read_packet(fd, io_loop=None, max_size=2048, callback=None):
+    if callback is None:
+        raise TypeError()
+    else:
+        io_loop = io_loop or tornado.ioloop.IOLoop.instance()
+
+        def _callback(fd, events):
+            io_loop.remove_handler(fd)
+            data, addr = fd.recvfrom(max_size)
+            callback((data, addr))
+
+        io_loop.add_handler(fd, _callback, io_loop.READ)
