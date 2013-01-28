@@ -124,7 +124,7 @@ class TUNDevice(Device):
     def configure_network(self, peer_pub_ip, peer_ip=None, my_ip=None,
             set_default_routes=False):
         self.interface_up(self.ifname, my_ip, peer_ip)
-        self.add_route(peer_ip, '255.255.255.255', peer_ip, self.ifname)
+        self.add_route(peer_ip, '255.255.255.255', my_ip, self.ifname)
         if set_default_routes:
             self.gw_ip, self.gw_ifname = get_route(peer_pub_ip)
             self.add_route(peer_pub_ip, '255.255.255.255', self.gw_ip, self.gw_ifname)
@@ -132,8 +132,8 @@ class TUNDevice(Device):
             self.add_route('128.0.0.0', '128.0.0.0', peer_ip, self.ifname)
 
     def restore_network(self, server_pub_ip, my_ip=None, peer_ip=None):
-        self.interface_down(self.ifname)
         self.restore_routes()
+        self.interface_down(self.ifname)
 
 
 class TUNDeviceManager(DeviceManager):
