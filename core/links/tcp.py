@@ -11,10 +11,13 @@ import tornado.ioloop
 import functools
 from datetime import timedelta
 from collections import deque
+import json
 
 
 class TCPLink(Link):
     MAGIC_WORD = 0x1306A15
+    CONTROL_MESSAGE_IDENTIFIER = 0x01
+    PACKET_IDENTIFIER = 0x02
 
     def __init__(self, stream):
         self.stream = stream
@@ -28,6 +31,10 @@ class TCPLink(Link):
         if not hasattr(self, "_name"):
             self._name = u"tcplink<%s:%d>" % (self.dest)
         return self._name
+
+    @property
+    def ip_endpoint(self):
+        return self.dest[0]
 
     def setup(self):
         self.send_magic_word()
@@ -49,7 +56,7 @@ class TCPLink(Link):
             self.stream.set_close_callback(self.on_close)
             self.logger.debug("received correct magic word: 0x%X" % word)
             callback()
-            self.io_loop.add_callback(self.wait_packet)
+            self.io_loop.add_callback(self.process_stream)
 
     def cleanup(self):
         self.callback = None
@@ -59,8 +66,14 @@ class TCPLink(Link):
         return self.connected
 
     def send_packet(self, packet):
-        self.stream.write(packet.serialize())
+        self.stream.write(struct.pack("!B", self.PACKET_IDENTIFIER) + packet.serialize())
         self.logger.debug("sent: %s" % str(packet))
+
+    def send_message(self, msg):
+        serialized = json.dumps(msg)
+        self.stream.write(struct.pack("!BL", self.CONTROL_MESSAGE_IDENTIFIER,
+            len(serialized)) + serialized)
+        self.logger.debug("sent message: " + str(msg))
 
     def on_close(self):
         self.connected = False
@@ -74,6 +87,34 @@ class TCPLink(Link):
         self.logger.debug("sent magic word: 0x%X" % self.MAGIC_WORD)
 
     @tornado.gen.engine
+    def process_stream(self):
+        type_byte, = struct.unpack("!B", (yield tornado.gen.Task(
+            self.stream.read_bytes, 1)))
+        if type_byte == self.CONTROL_MESSAGE_IDENTIFIER:
+            self.wait_message()
+        elif type_byte == self.PACKET_IDENTIFIER:
+            self.wait_packet()
+        else:
+            self.logger.error("came a wild id: 0x%X. it's a suicide!" % type_byte)
+            self.stream.close()
+
+    @tornado.gen.engine
+    def wait_message(self):
+        data = yield tornado.gen.Task(self.stream.read_bytes, struct.calcsize("!L"))
+        length, = struct.unpack("!L", data)
+        payload = yield tornado.gen.Task(self.stream.read_bytes, length)
+        try:
+            msg = json.loads(payload)
+        except:
+            self.logger.error("cannot parse message: %s" % payload)
+            self.stream.close()
+            return
+
+        self.logger.debug("received message: " + str(msg))
+        self.apply_message_callback(msg)
+        self.io_loop.add_callback(self.process_stream)
+
+    @tornado.gen.engine
     def wait_packet(self):
         data = yield tornado.gen.Task(self.stream.read_bytes, struct.calcsize("!H"))
         length, = struct.unpack("!H", data)
@@ -81,7 +122,7 @@ class TCPLink(Link):
         pkt = Packet(payload, source=self)
         self.logger.debug("received: " + str(pkt))
         self.apply_packet_callback(pkt)
-        self.io_loop.add_callback(self.wait_packet)
+        self.io_loop.add_callback(self.process_stream)
 
 
 class TCPLinkClientManager(object):

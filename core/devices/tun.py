@@ -1,12 +1,13 @@
 from .abstract import Device, DeviceManager
 from ..networking.packet import Packet
 from fcntl import ioctl
-from ..utils import Error, hexdump
+from ..utils import Error, hexdump, run_os_command, get_default_route
 import struct
 import tornado.ioloop
 import logging
 import sys
 import os.path
+import functools
 
 
 class TUNDevice(Device):
@@ -22,6 +23,7 @@ class TUNDevice(Device):
         self.callback = None
         self.fd = None
         self.ifname = None
+        self.added_routes = []
         self.setup_logger()
         self.logger.debug("created.")
 
@@ -66,7 +68,7 @@ class TUNDevice(Device):
             """
             Hack Tornado so that ERROR event is not automatically added, equal to:
 
-                self.io_loop._handlers[self.fd.fileno()] = self.on_read 
+                self.io_loop._handlers[self.fd.fileno()] = self.on_read
                 self.io_loop._impl.register(self.fd.fileno(), self.io_loop.READ)
             """
             self.logger.info("opened " + opened_path)
@@ -87,15 +89,51 @@ class TUNDevice(Device):
 
     def on_read(self, fd, events):
         payload = os.read(self.fd, self.MAX_BUF_SIZE)
-        print hexdump(payload)
         p = Packet(payload, source=self)
         self.logger.debug("read: %s" % str(p))
         self.apply_packet_callback(p)
 
     def send_packet(self, pkt):
-        print hexdump(pkt.payload)
         os.write(self.fd, pkt.payload)
         self.logger.debug("wrote: %s" % str(pkt))
+
+    def interface_up(self, *args):
+        if "darwin" in sys.platform:
+            run_os_command("/sbin/ifconfig %s %s %s mtu 1500 netmask 255.255.255.255 up" % args)
+        else:
+            run_os_command("/sbin/ifconfig %s %s pointtopoint %s up" % args)
+
+    def interface_down(self, ifname):
+        run_os_command("/sbin/ifconfig %s down" % ifname)
+
+    def modify_route(self, network, netmask, gateway_ip, gateway_ifname, operation="add"):
+        if "darwin" in sys.platform:
+            run_os_command("/sbin/route %s -net %s %s %s" (operation, network, gateway_ip, netmask))
+        else:
+            run_os_command("/sbin/route %s -net %s netmask %s gw %s dev %s" %
+                (operation, network, netmask, gateway_ip, gateway_ifname))
+
+    def add_route(self, *args):
+        self.modify_route(*args, operation="add")
+        self.added_routes.append(args)
+
+    def restore_routes(self):
+        for route in self.added_routes:
+            self.modify_route(*route, operation="del")
+        self.added_routes = []
+
+    def configure_network(self, server_public_ip, server_private_ip=None, client_private_ip=None,
+            add_routes=False):
+        self.interface_up(self.ifname, client_private_ip, server_private_ip)
+        if add_routes:
+            self.gw_ip, self.gw_ifname = get_default_route()
+            self.add_route(server_public_ip, '255.255.255.255', self.gw_ip, self.gw_ifname)
+            self.add_route('0.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
+            self.add_route('128.0.0.0', '128.0.0.0', server_private_ip, client_private_ip)
+
+    def restore_network(self, server_public_ip, server_private_ip=None, client_private_ip=None):
+        self.interface_down(self.ifname)
+        self.restore_routes()
 
 
 class TUNDeviceManager(DeviceManager):

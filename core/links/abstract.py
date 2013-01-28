@@ -16,8 +16,16 @@ class Link(object):
     def is_alive(self):
         return True
 
+    @abc.abstractproperty
+    def ip_endpoint(self):
+        return None
+
     @abc.abstractmethod
     def send_packet(self, packet):
+        pass
+
+    @abc.abstractmethod
+    def send_message(self, msg):
         pass
 
     def set_packet_callback(self, callback):
@@ -27,6 +35,14 @@ class Link(object):
         func = getattr(self, "packet_callback", None)
         if func:
             func(packet)
+
+    def set_message_callback(self, callback):
+        self.message_callback = callback
+
+    def apply_message_callback(self, msg):
+        func = getattr(self, "message_callback", None)
+        if func:
+            func(msg)
 
     def set_close_callback(self, callback):
         self.close_callback = callback

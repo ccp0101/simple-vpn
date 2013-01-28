@@ -1,3 +1,7 @@
+import subprocess
+import logging
+
+
 # used for port validation. returns True if valid.
 validate_port = lambda p: isinstance(p, int) and p > 0 and p < 65535
 
@@ -13,8 +17,33 @@ def hexdump(src, length=8):
     result = []
     digits = 4 if isinstance(src, unicode) else 2
     for i in xrange(0, len(src), length):
-       s = src[i:i+length]
-       hexa = b' '.join(["%0*X" % (digits, ord(x))  for x in s])
-       text = b''.join([x if 0x20 <= ord(x) < 0x7F else b'.'  for x in s])
-       result.append( b"%04X   %-*s   %s" % (i, length*(digits + 1), hexa, text) )
+        s = src[i:i+length]
+        hexa = b' '.join(["%0*X" % (digits, ord(x))  for x in s])
+        text = b''.join([x if 0x20 <= ord(x) < 0x7F else b'.'  for x in s])
+        result.append( b"%04X   %-*s   %s" % (i, length*(digits + 1), hexa, text) )
     return b'\n'.join(result)
+
+
+def get_default_route():
+    """
+    Executes a system command to retrieve default route, and returns (gateway_ip, gateway_ifname)
+    """
+    command = "netstat -nr | grep '^default'"
+    try:
+        out = subprocess.check_output(command, shell=True)
+    except subprocess.CalledProcessError as e:
+        logging.warning("\"%s\" returned %d" % (command, e.returncode))
+        return ('', '')
+    comps = out.strip().split()
+    return (comps[1], comps[5])
+
+
+def run_os_command(command, params=[], supress_error=True):
+    command = command + " " + " ".join(params)
+    logging.info("executing: %s" % command)
+    try:
+        subprocess.check_call(command, shell=True)
+    except subprocess.CalledProcessError as e:
+        logging.warning("returned %d" % e.returncode)
+        return e.returncode
+    return 0

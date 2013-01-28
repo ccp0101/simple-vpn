@@ -7,8 +7,8 @@ if __name__ == "__main__":
         },
         "link": {
             "port": 20124,
-            # "host": "127.0.0.1",
-            "host": "10.0.2.17",
+            "host": "127.0.0.1",
+            # "host": "10.0.2.17",
         },
         "hooks": {
             "start": "/Users/ccp/code/simple-vpn/start.sh",

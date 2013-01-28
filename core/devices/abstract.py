@@ -24,6 +24,14 @@ class Device(object):
         if func:
             func(packet)
 
+    @abc.abstractmethod
+    def configure_network(self, server_public_ip, server_private_ip=None, client_private_ip=None):
+        pass
+
+    @abc.abstractmethod
+    def restore_network(self, server_public_ip, server_private_ip=None, client_private_ip=None):
+        pass
+
 
 class DeviceManager(object):
     __metaclass__ = abc.ABCMeta
