@@ -5,7 +5,7 @@ import logging
 import json
 import tornado.ioloop
 from links.tcp import TCPLinkClientManager, TCPLinkServerManager
-from devices.bsd import DivertSocketDeviceManager
+# from devices.bsd import DivertSocketDeviceManager
 from devices.tun import TUNDeviceManager
 from session import Session
 import tornado.gen
