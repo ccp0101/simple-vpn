@@ -100,7 +100,7 @@ class TUNDevice(Device):
         if "darwin" in sys.platform:
             run_os_command("/sbin/ifconfig %s %s %s mtu 1500 netmask 255.255.255.255 up" % args)
         else:
-            run_os_command("/sbin/ifconfig %s %s pointtopoint %s up" % args)
+            run_os_command("/sbin/ifconfig %s %s pointtopoint %s mtu 1500" % args)
 
     def interface_down(self, ifname):
         run_os_command("/sbin/ifconfig %s down" % ifname)
