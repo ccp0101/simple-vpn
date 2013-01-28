@@ -17,7 +17,19 @@ from datetime import timedelta
 class Application(object):
     def __init__(self, mode, config):
         format = "%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d\t%(name)s\t%(message)s"
-        logging.basicConfig(level=logging.DEBUG, format=format)
+
+        parser = argparse.ArgumentParser(
+            description='A simple VPN implementation with flexible data transportation.')
+        parser.add_argument('--logging', type=str, default='info',
+            help='Log level: debug, info, warning, or error. (Default:info)')
+        args = parser.parse_args()
+
+        level = args.logging
+        if level.lower() not in ['debug', 'info', 'warning', 'error']:
+            print >> sys.stderr, "Unknown log level: " + level
+        level = getattr(logging, level.upper())
+
+        logging.basicConfig(level=level, format=format)
         self.logger = logging.getLogger("app")
         self.io_loop = tornado.ioloop.IOLoop(impl=tornado.ioloop._Select())
         self.io_loop.install()

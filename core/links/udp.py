@@ -151,6 +151,7 @@ class UDPLinkClientManager(object):
 
         self.socket.sendto(struct.pack("!L", UDP_MAGIC_WORD), addr)
 
+        self.logging.debug("sent initialial message.")
         data, peer = yield tornado.gen.Task(read_packet, self.socket)
         if data == RESET_PACKET:
             callback(None)
