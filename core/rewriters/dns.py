@@ -34,9 +34,20 @@ class NameserverRewriter(Rewriter):
     def rewrite(self, pkt):
         ip = IP(pkt)
         if ip.haslayer(DNS):
+            dns = ip.getlayer(DNS)
+            print str(dns.id)
+            # if dns.qr == 0:  # query
+            #     record = {
+            #         'dst_ip':  ip.dst,
+            #         'time': datetime.utcnow()
+            #     }
+            #     self.records[dns.id] = record
+            #     self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
+            #         self.config['force_nameserver']))
+            #     ip.dst = self.config['force_nameserver']
+            #     return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
             return str(ip)
         return pkt
-        #     dns = ip.getlayer(DNS)
         #     # import pdb
         #     # pdb.set_trace()
         #     if dns.qr == 0:  # query
