@@ -6,15 +6,15 @@ if __name__ == "__main__":
             "class": "core.devices.tun.TUNDevice"
         },
         "link": {
-            "class": "core.links.tcp.TCPLink",
+            "class": "core.links.udp.UDPLink",
             "port": 20124,
         },
-        "rewriters": [
-            {
-                "class": "core.rewriters.dns.NameserverRewriter",
-                "force_nameserver": "8.8.8.8"
-            }
-        ],
+        # "rewriters": [
+        #     {
+        #         "class": "core.rewriters.dns.NameserverRewriter",
+        #         "force_nameserver": "8.8.8.8"
+        #     }
+        # ],
         "network": "10.48.0.0/24"
         })
     app.run()

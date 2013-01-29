@@ -6,7 +6,7 @@ if __name__ == "__main__":
             "class": "core.devices.tun.TUNDevice"
         },
         "link": {
-            "class": "core.links.tcp.TCPLink",
+            "class": "core.links.udp.UDPLink",
             "port": 20124,
             "host": "143.89.220.80"
             # "host": "127.0.0.1",
