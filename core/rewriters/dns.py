@@ -34,9 +34,9 @@ class NameserverRewriter(Rewriter):
     def rewrite(self, pkt):
         ip = IP(pkt)
         if ip.haslayer(DNS):
+            iph = ip.getlayer(IP)
+            udph = ip.getlayer(UDP)
             dns = ip.getlayer(DNS)
-            del ip.getlayer(IP).chksum
-            del ip.getlayer(UDP).chksum
             print str(dns.id)
             # if dns.qr == 0:  # query
             #     record = {
@@ -48,7 +48,12 @@ class NameserverRewriter(Rewriter):
             #         self.config['force_nameserver']))
             #     ip.dst = self.config['force_nameserver']
             #     return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-            return str(ip)[:len(pkt)]
+            del iph.chksum
+            del udph.chksum
+            del iph.len
+            del udph.len
+            return str(iph / udph / dns)
+            # return str(ip)[:len(pkt)]
             # return str(ip)
         return pkt
         #     # import pdb
