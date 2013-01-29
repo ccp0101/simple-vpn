@@ -48,8 +48,8 @@ class NameserverRewriter(Rewriter):
             #         self.config['force_nameserver']))
             #     ip.dst = self.config['force_nameserver']
             #     return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-            # return str(ip)[:len(pkt)]
-            return str(ip)
+            return str(ip)[:len(pkt)]
+            # return str(ip)
         return pkt
         #     # import pdb
         #     # pdb.set_trace()
