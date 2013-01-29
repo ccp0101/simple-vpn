@@ -4,6 +4,108 @@ import functools
 import ipaddr
 import traceback
 from .utils import import_class
+import subprocess
+import re
+import sys
+
+
+class NameserversEditor(object):
+    def __init__(self, nameservers):
+        self.nameservers = nameservers
+        self.original_nameservers = None
+        self.logger = logging.getLogger("nameservers-editor")
+
+    def get_scutil_output(self, stdin, command="/usr/sbin/scutil"):
+        self.logger.debug("invoking " + command + " with: " + stdin)
+        try:
+            p = subprocess.Popen(command, shell=True,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            stdout, stderr = p.communicate(stdin)
+            if p.returncode != 0:
+                raise subprocess.CalledProcessError(returncode=p.returncode)
+        except:
+            self.logger.warning(traceback.format_exc())
+            return ""
+        return stdout
+
+    def set(self):
+        if "darwin" in sys.platform:
+            stdin = """
+                open
+                get State:/Network/Global/IPv4
+                d.show
+                quit
+            """
+            out = self.get_scutil_output(stdin,
+                "/usr/sbin/scutil | grep 'PrimaryService' | awk '{print $3}'").strip()
+            if not re.match(r'[A-Z0-9a-z]{8}-[A-Z0-9a-z]{4}-[A-Z0-9a-z]{4}-[A-Z0-9a-z]{4}-[A-Z0-9a-z]{12}',
+                    out):
+                self.logger.warning("did not get primary service ID from scutil: " + out)
+                return
+            else:
+                self.service_id = out
+
+            stdin = """
+                open
+                get State:/Network/Service/%s/DNS
+                d.show
+                quit
+            """ % self.service_id
+
+            out = self.get_scutil_output(stdin)
+            out = out.replace("\n", " ")
+            server_addresses = re.findall(r'ServerAddresses[^{]+\{(.+)\}', out)
+            if len(server_addresses) != 1:
+                self.logger.warning("cannot parser: " + out)
+                return
+
+            _nameservers = re.findall(r'(\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{0,3})', server_addresses[0])
+            _domain_name = re.findall(r'DomainName\s+\:\s+([^\s\}]+)[\s\}]', out)
+            _domain_name = _domain_name[0] if len(_domain_name) else None
+            self.logger.debug("found existing nameservers: %s and domain name: %s" %
+                (str(_nameservers), str(_domain_name)))
+
+            domain_name_config = ""
+            if _domain_name:
+                domain_name_config = "d.add DomainName " + _domain_name
+
+            stdin = """open
+                    d.init
+                    d.add ServerAddresses * %s
+                    %s
+                    set State:/Network/Service/%s/DNS
+                    quit
+                    """ % (" ".join(self.nameservers), domain_name_config, self.service_id)
+
+            out = self.get_scutil_output(stdin).strip()
+            if len(out) != 0:
+                self.logger.warning("cannot set name configurations with scutil.")
+                return
+
+            self.original_nameservers = _nameservers
+            self.original_domain = _domain_name
+            self.logger.info("original nameservers: %s, new nameservers: %s" %
+                (str(_nameservers), str(self.nameservers)))
+        else:
+            self.logger.warning("I don't know how to set nameservers in non-Mac")
+
+    def restore(self):
+        if self.original_nameservers:
+            domain_string = ""
+            if self.original_domain:
+                domain_string = "d.add DomainName %s" % self.original_domain
+            stdin = """open
+                    d.init
+                    d.add ServerAddresses * %s
+                    %s
+                    set State:/Network/Service/%s/DNS
+                    quit
+                    """ % (" ".join(self.original_nameservers),
+                        domain_string, self.service_id)
+
+            out = self.get_scutil_output(stdin).strip()
+            if len(out) != 0:
+                self.logger.warning("cannot set name configurations with scutil.")
 
 
 class IPAddressSpaceManager(object):
@@ -44,7 +146,10 @@ class Session(object):
         self.setup_callback = None
         self.ip_allocated = False
         self.rewriters = []
+        self.original_dns = []
+        self.old_nameservers = None
         self.network_configured = False
+        self.nameservers_editor = None
 
         for rewriter_config in self.config["rewriters"]:
             if "class" not in rewriter_config:
@@ -106,6 +211,10 @@ class Session(object):
         self.logger.debug("configuring network.")
         self.device.configure_network(*self.configuration_parameters(),
             set_default_routes=(self.mode == "client"))
+        if "nameservers" in self.config:
+            self.nameservers_editor = NameserversEditor(self.config["nameservers"])
+            self.nameservers_editor.set()
+
         self.network_configured = True
 
         self.device.set_packet_callback(self.on_device_packet)
@@ -141,6 +250,9 @@ class Session(object):
         self.device.send_packet(packet)
 
     def cleanup(self):
+        if self.nameservers_editor:
+            self.nameservers_editor.restore()
+
         if self.network_configured:
             self.device.restore_network(*self.configuration_parameters())
         if self.ip_allocated:

@@ -106,8 +106,8 @@ class TUNDevice(Device):
             run_os_command(("/sbin/ifconfig %s %s %s mtu " + str(self.MTU) +
                 " netmask 255.255.255.255 up") % args)
         else:
-            run_os_command(("/sbin/ifconfig %s %s pointtopoint %s mtu " + str(self.MTU) +
-                " up") % args)
+            run_os_command(("/sbin/ifconfig %s %s mtu " + str(self.MTU) +
+                " up") % (args[0], args[1]))
 
     def interface_down(self, ifname):
         run_os_command("/sbin/ifconfig %s down" % ifname)
