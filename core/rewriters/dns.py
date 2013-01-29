@@ -35,6 +35,8 @@ class NameserverRewriter(Rewriter):
         ip = IP(pkt)
         if ip.haslayer(DNS):
             dns = ip.getlayer(DNS)
+            import pdb
+            pdb.set_trace()
             if dns.qr == 0:  # query
                 record = {
                     'dst_ip':  ip.dst,
