@@ -46,6 +46,7 @@ class NameserverRewriter(Rewriter):
                 ip.dst = self.config['force_nameserver']
                 return str(ip)
             elif dns.qr == 1:  # answer
+                self.logger.debug("found DNS answer: " + dns.summary())
                 record = self.records.get(dns.id, None)
                 if record:
                     self.logger.debug("rewriting DNS answer: %s to %s" % (ip.src,
