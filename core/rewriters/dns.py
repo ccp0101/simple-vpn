@@ -37,46 +37,28 @@ class NameserverRewriter(Rewriter):
             iph = ip.getlayer(IP)
             udph = ip.getlayer(UDP)
             dns = ip.getlayer(DNS)
-            print str(dns.id)
-            # if dns.qr == 0:  # query
-            #     record = {
-            #         'dst_ip':  ip.dst,
-            #         'time': datetime.utcnow()
-            #     }
-            #     self.records[dns.id] = record
-            #     self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
-            #         self.config['force_nameserver']))
-            #     ip.dst = self.config['force_nameserver']
-            #     return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
+            if dns.qr == 0:  # query
+                record = {
+                    'dst_ip':  iph.dst,
+                    'time': datetime.utcnow()
+                }
+                self.records[dns.id] = record
+                self.logger.debug("rewriting DNS query: %s to %s" % (iph.dst,
+                    self.config['force_nameserver']))
+                iph.dst = self.config['force_nameserver']
+            elif dns.qr == 1:  # answer
+                self.logger.debug("found DNS answer: " + dns.summary())
+                record = self.records.get(dns.id, None)
+                if record:
+                    self.logger.debug("rewriting DNS answer: %s to %s" % (iph.src,
+                        record['dst_ip']))
+                    iph.src = record['dst_ip']
+                    del self.records[dns.id]
             del iph.chksum
             del udph.chksum
             del iph.len
             del udph.len
             return str(iph / udph / dns)
-            # return str(ip)[:len(pkt)]
-            # return str(ip)
-        return pkt
-        #     # import pdb
-        #     # pdb.set_trace()
-        #     if dns.qr == 0:  # query
-        #         record = {
-        #             'dst_ip':  ip.dst,
-        #             'time': datetime.utcnow()
-        #         }
-        #         self.records[dns.id] = record
-        #         self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
-        #             self.config['force_nameserver']))
-        #         ip.dst = self.config['force_nameserver']
-        #         return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-        #     elif dns.qr == 1:  # answer
-        #         self.logger.debug("found DNS answer: " + dns.summary())
-        #         record = self.records.get(dns.id, None)
-        #         if record:
-        #             self.logger.debug("rewriting DNS answer: %s to %s" % (ip.src,
-        #                 record['dst_ip']))
-        #             ip.src = record['dst_ip']
-        #             del self.records[dns.id]
-        #             return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
 
     def clear_timeout(self):
         for dns_id in self.records:
