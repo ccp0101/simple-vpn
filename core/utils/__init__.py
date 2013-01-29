@@ -85,3 +85,10 @@ def read_packet(fd, io_loop=None, max_size=2048, callback=None):
             callback((data, addr))
 
         io_loop.add_handler(fd, _callback, io_loop.READ)
+
+
+def import_class(cl):
+    d = cl.rfind(".")
+    classname = cl[d + 1: len(cl)]
+    m = __import__(cl[0:d], globals(), locals(), [classname])
+    return getattr(m, classname)

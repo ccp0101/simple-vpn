@@ -26,15 +26,22 @@ CONNECTION_DEATH_SECONDS = 90
 class UDPLink(Link):
     MAGIC_WORD = 0x1306A15
 
+    @classmethod
+    def get_manager_class(cls, mode):
+        if mode == "server":
+            return UDPLinkServerManager
+        elif mode == "client":
+            return UDPLinkClientManager
+
     def __init__(self, manager, address):
         self.manager = manager
         self.dest = address
         self.logger = logging.getLogger(str(self))
         self.logger.debug("created.")
         self.periodic_check = tornado.ioloop.PeriodicCallback(self.check_alive,
-            timedelta(seconds=CHECK_SECONDS))
+            CHECK_SECONDS * 1000)
         self.periodic_send_alive = tornado.ioloop.PeriodicCallback(
-            self.send_alive, timedelta(seconds=KEEP_ALIVE_SECONDS))
+            self.send_alive, KEEP_ALIVE_SECONDS * 1000)
         self.record_alive()
 
     def __str__(self):
@@ -137,7 +144,7 @@ class UDPLinkClientManager(object):
         self.logger.debug("created.")
 
     def __str__(self):
-        return "udp<%d>" % self.config['port']
+        return "udp<%s:%d>" % (self.config['host'], self.config['port'])
 
     def setup(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

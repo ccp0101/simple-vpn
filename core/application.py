@@ -4,9 +4,7 @@ import argparse
 import logging
 import json
 import tornado.ioloop
-from links.udp import UDPLinkServerManager, UDPLinkClientManager
-# from links.tcp import TCPLinkClientManager, TCPLinkServerManager
-# from devices.bsd import DivertSocketDeviceManager
+from .utils import import_class
 from devices.tun import TUNDeviceManager
 from session import Session
 import tornado.gen
@@ -35,13 +33,31 @@ class Application(object):
         self.io_loop.install()
         self.mode = mode
         self.config = config
+        self.config.setdefault("link", {})
+        self.config.setdefault("rewriters", [])
+        self.config.setdefault("device", {})
         self.session = None
-        if self.mode == "client":
-            self.link_manager = UDPLinkClientManager(self.config.get('link', {}))
-            self.device_manager = TUNDeviceManager(self.config.get('device', {}))
-        else:
-            self.link_manager = UDPLinkServerManager(self.config.get('link', {}))
-            self.device_manager = TUNDeviceManager(self.config.get('device', {}))
+
+        if "class" not in self.config["link"]:
+            self.logger.error("Must define class in link configuration.")
+            sys.exit(1)
+
+        if "class" not in self.config["device"]:
+            self.logger.error("Must define class in device configuration.")
+            sys.exit(1)
+
+        try:
+            link_cls = import_class(self.config["link"]["class"])
+            device_cls = import_class(self.config["device"]["class"])
+        except ImportError as e:
+            self.logger.error(str(e))
+            sys.exit(1)
+
+        link_manager_cls = link_cls.get_manager_class(self.mode)
+        device_manager_cls = device_cls.get_manager_class(self.mode)
+        self.link_manager = link_manager_cls(self.config["link"])
+        self.device_manager = device_manager_cls(self.config["device"])
+
         self.sessions = []
 
     def _run(self):

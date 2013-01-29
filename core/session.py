@@ -1,9 +1,9 @@
 import logging
-import subprocess
 import uuid
 import functools
 import ipaddr
-from utils import run_os_command
+import traceback
+from .utils import import_class
 
 
 class IPAddressSpaceManager(object):
@@ -11,6 +11,7 @@ class IPAddressSpaceManager(object):
         self.definition = definition
         self.network = ipaddr.ip_network(self.definition)
         self.hosts = list(self.network.iterhosts())
+        self.rewriters = []
 
     @classmethod
     def shared(cls, definition):
@@ -41,7 +42,24 @@ class Session(object):
             str(self.link)))
         self.close_callback = None
         self.setup_callback = None
+        self.ip_allocated = False
+        self.rewriters = []
         self.network_configured = False
+
+        for rewriter_config in self.config["rewriters"]:
+            if "class" not in rewriter_config:
+                self.logger.error("Must define class in rewriter configuration: %s" % rewriter_config)
+            else:
+                class_name = rewriter_config["class"]
+                try:
+                    rewriter_cls = import_class(class_name)
+                except ImportError as e:
+                    self.logger.error(str(e))
+                    continue
+                rewriter = rewriter_cls(rewriter_config)
+                rewriter.setup()
+                self.rewriters.append(rewriter)
+
         self.logger.debug("created.")
 
     def setup(self, close_callback):
@@ -62,11 +80,12 @@ class Session(object):
         if msg.get("type") == "ip_request" and self.mode == "server":
             self.server_ip, self.client_ip = self.ip_manager.allocate(
                 ), self.ip_manager.allocate()
+            self.ip_allocated = True
             self.link.send_message({
                 "type": "ip_reply",
                 "server_ip": self.server_ip,
+                "network":  self.config['network'],
                 "client_ip": self.client_ip,
-                "network":  self.config['network']
                 })
         elif msg.get("type") == "ip_confirm" and self.mode == "server":
             self.finalize_session()
@@ -94,16 +113,45 @@ class Session(object):
         self.logger.info("session initiated!")
 
     def on_device_packet(self, packet):
+        data = packet.payload
+        for rewriter in self.rewriters:
+            try:
+                modified = rewriter.rewrite(data)
+                if modified != None:
+                    data = modified
+            except:
+                self.logger.error(traceback.format_exc())
+                break
+
+        packet.payload = data
         self.link.send_packet(packet)
 
     def on_link_packet(self, packet):
+        data = packet.payload
+        for rewriter in self.rewriters:
+            try:
+                modified = rewriter.rewrite(data)
+                if modified != None:
+                    data = modified
+            except:
+                self.logger.error(traceback.format_exc())
+                break
+
+        packet.payload = data
         self.device.send_packet(packet)
 
     def cleanup(self):
         if self.network_configured:
             self.device.restore_network(*self.configuration_parameters())
+        if self.ip_allocated:
+            self.ip_manager.release(self.server_ip)
+            self.ip_manager.release(self.client_ip)
 
         self.device.set_packet_callback(None)
         self.link.set_packet_callback(None)
+
+        for rewriter in self.rewriters:
+            rewriter.cleanup()
+
         self.link.cleanup()
         self.device.cleanup()

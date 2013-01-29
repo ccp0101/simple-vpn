@@ -18,6 +18,10 @@ class TUNDevice(Device):
     IFNAME_PREFIX = "vpn"
     MTU = 1460
 
+    @classmethod
+    def get_manager_class(cls, mode):
+        return TUNDeviceManager
+
     def __init__(self, io_loop=None):
         self.io_loop = io_loop or tornado.ioloop.IOLoop.instance()
         self.callback = None

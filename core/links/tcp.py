@@ -19,6 +19,13 @@ class TCPLink(Link):
     CONTROL_MESSAGE_IDENTIFIER = 0x01
     PACKET_IDENTIFIER = 0x02
 
+    @classmethod
+    def get_manager_class(cls, mode):
+        if mode == "server":
+            return TCPLinkServerManager
+        elif mode == "client":
+            return TCPLinkClientManager
+
     def __init__(self, stream):
         self.stream = stream
         self.io_loop = tornado.ioloop.IOLoop.instance()

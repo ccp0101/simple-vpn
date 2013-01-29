@@ -7,6 +7,10 @@ from ..utils import Error
 class Device(object):
     __metaclass__ = abc.ABCMeta
 
+    @classmethod
+    def get_manager_class(cls, mode):
+        return None
+
     def setup(self):
         pass
 
