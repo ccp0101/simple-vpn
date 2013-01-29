@@ -33,30 +33,30 @@ class NameserverRewriter(Rewriter):
 
     def rewrite(self, pkt):
         ip = IP(pkt)
-        if ip.haslayer(DNS):
-            dns = ip.getlayer(DNS)
-            # import pdb
-            # pdb.set_trace()
-            if dns.qr == 0:  # query
-                record = {
-                    'dst_ip':  ip.dst,
-                    'time': datetime.utcnow()
-                }
-                self.records[dns.id] = record
-                self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
-                    self.config['force_nameserver']))
-                ip.dst = self.config['force_nameserver']
-                return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-            elif dns.qr == 1:  # answer
-                self.logger.debug("found DNS answer: " + dns.summary())
-                record = self.records.get(dns.id, None)
-                if record:
-                    self.logger.debug("rewriting DNS answer: %s to %s" % (ip.src,
-                        record['dst_ip']))
-                    ip.src = record['dst_ip']
-                    del self.records[dns.id]
-                    return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-        return pkt
+        # if ip.haslayer(DNS):
+        #     dns = ip.getlayer(DNS)
+        #     # import pdb
+        #     # pdb.set_trace()
+        #     if dns.qr == 0:  # query
+        #         record = {
+        #             'dst_ip':  ip.dst,
+        #             'time': datetime.utcnow()
+        #         }
+        #         self.records[dns.id] = record
+        #         self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
+        #             self.config['force_nameserver']))
+        #         ip.dst = self.config['force_nameserver']
+        #         return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
+        #     elif dns.qr == 1:  # answer
+        #         self.logger.debug("found DNS answer: " + dns.summary())
+        #         record = self.records.get(dns.id, None)
+        #         if record:
+        #             self.logger.debug("rewriting DNS answer: %s to %s" % (ip.src,
+        #                 record['dst_ip']))
+        #             ip.src = record['dst_ip']
+        #             del self.records[dns.id]
+        #             return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
+        return str(ip)
 
     def clear_timeout(self):
         for dns_id in self.records:

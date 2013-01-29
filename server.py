@@ -10,10 +10,10 @@ if __name__ == "__main__":
             "port": 20124,
         },
         "rewriters": [
-            {
-                "class": "core.rewriters.dns.NameserverRewriter",
-                "force_nameserver": "8.8.8.8"
-            }
+            # {
+            #     "class": "core.rewriters.dns.NameserverRewriter",
+            #     "force_nameserver": "8.8.8.8"
+            # }
         ],
         "network": "10.48.0.0/24"
         })
