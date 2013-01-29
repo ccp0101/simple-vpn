@@ -35,8 +35,8 @@ class NameserverRewriter(Rewriter):
         ip = IP(pkt)
         if ip.haslayer(DNS):
             dns = ip.getlayer(DNS)
-            import pdb
-            pdb.set_trace()
+            # import pdb
+            # pdb.set_trace()
             if dns.qr == 0:  # query
                 record = {
                     'dst_ip':  ip.dst,
@@ -46,7 +46,7 @@ class NameserverRewriter(Rewriter):
                 self.logger.debug("rewriting DNS query: %s to %s" % (ip.dst,
                     self.config['force_nameserver']))
                 ip.dst = self.config['force_nameserver']
-                return str(ip.getlayer[IP] / ip.getlayer[UDP] / dns)
+                return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
             elif dns.qr == 1:  # answer
                 self.logger.debug("found DNS answer: " + dns.summary())
                 record = self.records.get(dns.id, None)
@@ -55,7 +55,7 @@ class NameserverRewriter(Rewriter):
                         record['dst_ip']))
                     ip.src = record['dst_ip']
                     del self.records[dns.id]
-                    return str(ip.getlayer[IP] / ip.getlayer[UDP] / dns)
+                    return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
         return pkt
 
     def clear_timeout(self):
