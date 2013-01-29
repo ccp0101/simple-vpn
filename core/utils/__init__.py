@@ -36,7 +36,7 @@ def get_route(addr):
     For Mac: route get <address>
     """
     if "darwin" in sys.platform:
-        command = "/sbin/route get " + addr
+        command = "/sbin/route -n get " + addr
     else:
         command = "/sbin/ip route get " + addr
     try:

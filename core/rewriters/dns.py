@@ -33,7 +33,9 @@ class NameserverRewriter(Rewriter):
 
     def rewrite(self, pkt):
         ip = IP(pkt)
-        # if ip.haslayer(DNS):
+        if ip.haslayer(DNS):
+            return str(ip)
+        return pkt
         #     dns = ip.getlayer(DNS)
         #     # import pdb
         #     # pdb.set_trace()
@@ -56,7 +58,6 @@ class NameserverRewriter(Rewriter):
         #             ip.src = record['dst_ip']
         #             del self.records[dns.id]
         #             return str(ip.getlayer(IP) / ip.getlayer(UDP) / dns)
-        return str(ip)
 
     def clear_timeout(self):
         for dns_id in self.records:
