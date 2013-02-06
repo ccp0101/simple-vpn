@@ -148,6 +148,7 @@ class UDPLinkClientManager(object):
 
     def setup(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     def cleanup(self):
         self.io_loop.remove_handler(self.socket)
@@ -158,7 +159,7 @@ class UDPLinkClientManager(object):
 
         self.socket.sendto(struct.pack("!L", UDP_MAGIC_WORD), addr)
 
-        self.logger.debug("sent initialial message.")
+        self.logger.info("sent initialial message.")
         data, peer = yield tornado.gen.Task(read_packet, self.socket)
         if data == RESET_PACKET:
             callback(None)
@@ -205,6 +206,7 @@ class UDPLinkServerManager(object):
 
     def setup(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('0.0.0.0', self.config['port']))
         self.logger.info("listening for UDP packets on port %d" %
             self.config['port'])
