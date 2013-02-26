@@ -37,6 +37,11 @@ class LocalNameserver(Addon):
             self.config.get('port', 53)))
         self.io_loop.add_handler(self.socket.fileno(),
             self.on_read, self.io_loop.READ)
+        self.session.add_message_callback("resolve_response", self.on_resolve_response)
+
+    def on_resolve_request(self, msg):
+        data = msg["data"]
+        
 
     def on_read(self, fd, events):
         data, addr = self.socket.recvfrom(2048)

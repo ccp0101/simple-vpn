@@ -3,6 +3,7 @@ import uuid
 import functools
 import ipaddr
 import traceback
+import tornado.stack_context
 from .utils import import_class
 
 
@@ -45,6 +46,7 @@ class Session(object):
         self.setup_callback = None
         self.ip_allocated = False
         self.rewriters = []
+        self.message_callbacks = {}
         self.addons = []
         self.original_dns = []
         self.old_nameservers = None
@@ -74,7 +76,7 @@ class Session(object):
                 except ImportError as e:
                     self.logger.error(str(e))
                     continue
-                addon = addon_cls(addon_config)
+                addon = addon_cls(addon_config, self)
                 addon.setup()
                 self.addons.append(addon)
 
@@ -94,6 +96,9 @@ class Session(object):
                 "type": "ip_request"
                 })
 
+    def add_message_callback(self, _type, callback):
+        self.message_callbacks[_type] = tornado.stack_context(callback)
+
     def on_message(self, msg):
         if msg.get("type") == "ip_request" and self.mode == "server":
             self.server_ip, self.client_ip = self.ip_manager.allocate(
@@ -112,6 +117,9 @@ class Session(object):
             self.client_ip = msg["client_ip"]
             self.link.send_message({"type": "ip_confirm"})
             self.finalize_session()
+        else:
+            callback = self.message_callbacks.get(msg["type"], None)
+            callback(msg)
 
     def configuration_parameters(self):
         #  peer_pub_ip, peer_ip=None, my_ip=None
@@ -123,7 +131,7 @@ class Session(object):
     def finalize_session(self):
         self.logger.debug("configuring network.")
         self.device.configure_network(*self.configuration_parameters(),
-            set_default_routes=(self.mode == "client"))
+            set_default_routes=(self.mode == "client" and self.config.get("set_default_gateway", True)))
 
         for addon in self.addons:
             addon.on_session_established()

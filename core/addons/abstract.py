@@ -4,7 +4,8 @@ import abc
 class Addon(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, config):
+    def __init__(self, config, session):
+    	self.session = session
         self.config = config
 
     def setup(self):

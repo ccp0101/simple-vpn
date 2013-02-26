@@ -10,6 +10,7 @@ from session import Session
 import tornado.gen
 import uuid
 from datetime import timedelta
+import atexit
 
 
 class Application(object):
@@ -37,6 +38,7 @@ class Application(object):
         self.config.setdefault("rewriters", [])
         self.config.setdefault("device", {})
         self.session = None
+        self.cleaned_up = None
 
         if "class" not in self.config["link"]:
             self.logger.error("Must define class in link configuration.")
@@ -95,14 +97,17 @@ class Application(object):
     def run(self):
         self.io_loop.add_callback(self._run)
         try:
+            atexit.register(self.cleanup)
             self.io_loop.start()
         except KeyboardInterrupt:
             self.cleanup()
 
     def cleanup(self):
-        self.logger.info("cleaning up...")
-        for session in self.sessions:
-            session.cleanup()
-        self.link_manager.cleanup()
-        self.device_manager.cleanup()
+        if not self.cleaned_up:
+            self.cleaned_up = True
+            self.logger.info("cleaning up...")
+            for session in self.sessions:
+                session.cleanup()
+            self.link_manager.cleanup()
+            self.device_manager.cleanup()
         self.io_loop.stop()
