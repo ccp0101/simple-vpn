@@ -1,36 +1,10 @@
 import logging
 import uuid
 import functools
-import ipaddr
 import traceback
 import tornado.stack_context
-from .utils import import_class
-
-
-class IPAddressSpaceManager(object):
-    def __init__(self, definition):
-        self.definition = definition
-        self.network = ipaddr.ip_network(self.definition)
-        self.hosts = list(self.network.iterhosts())
-        self.rewriters = []
-        self.addons = []
-
-    @classmethod
-    def shared(cls, definition):
-        attr_name = "_shared_instance"
-        if not cls.hasattr(attr_name):
-            instance = IPAddressSpaceManager(definition)
-            setattr(cls, attr_name, instance)
-        return getattr(cls, attr_name)
-
-    def allocate(self):
-        try:
-            return self.hosts.pop(0).exploded
-        except IndexError:
-            return None
-
-    def release(self, host):
-        self.hosts.append(host)
+from .utils import import_class, ExceptionIgnoredExecution
+from .networking.ip import IPAddressSpaceManager
 
 
 class Session(object):
@@ -42,33 +16,14 @@ class Session(object):
         self.link = link
         self.logger = logging.getLogger("session[%s,%s]" % (str(self.device),
             str(self.link)))
-        self.close_callback = None
-        self.setup_callback = None
-        self.ip_allocated = False
-        self.rewriters = []
         self.message_callbacks = {}
+        self.rewriter_callbacks = []
         self.addons = []
-        self.original_dns = []
-        self.old_nameservers = None
         self.network_configured = False
-
-        for rewriter_config in self.config["rewriters"]:
-            if "class" not in rewriter_config:
-                self.logger.error("Must define class in rewriter configuration: %s" % rewriter_config)
-            else:
-                class_name = rewriter_config["class"]
-                try:
-                    rewriter_cls = import_class(class_name)
-                except ImportError as e:
-                    self.logger.error(str(e))
-                    continue
-                rewriter = rewriter_cls(rewriter_config)
-                rewriter.setup()
-                self.rewriters.append(rewriter)
 
         for addon_config in self.config["addons"]:
             if "class" not in addon_config:
-                self.logger.error("Must define class in addon configuration: %s" % rewriter_config)
+                self.logger.error("Must define class in addon configuration: %s" % addon_config)
             else:
                 class_name = addon_config["class"]
                 try:
@@ -82,44 +37,26 @@ class Session(object):
 
         self.logger.debug("created.")
 
+    def setup_completed(self):
+        raise NotImplemented()
+
     def setup(self, close_callback):
         self.link.set_message_callback(self.on_message)
         real_callback = functools.partial(close_callback, self)
         self.link.set_close_callback(real_callback)
         self.device.setup()
         self.logger.info("device initiated!")
-
-        if self.mode == "server":
-            self.ip_manager = IPAddressSpaceManager(self.config['network'])
-        else:
-            self.link.send_message({
-                "type": "ip_request"
-                })
+        self.setup_completed()
 
     def add_message_callback(self, _type, callback):
-        self.message_callbacks[_type] = tornado.stack_context(callback)
+        self.message_callbacks[_type] = tornado.stack_context.wrap(callback)
+
+    def add_rewriter_callback(self, callback):
+        self.rewriter_callbacks.append(tornado.stack_context(callback))
 
     def on_message(self, msg):
-        if msg.get("type") == "ip_request" and self.mode == "server":
-            self.server_ip, self.client_ip = self.ip_manager.allocate(
-                ), self.ip_manager.allocate()
-            self.ip_allocated = True
-            self.link.send_message({
-                "type": "ip_reply",
-                "server_ip": self.server_ip,
-                "network":  self.config['network'],
-                "client_ip": self.client_ip,
-                })
-        elif msg.get("type") == "ip_confirm" and self.mode == "server":
-            self.finalize_session()
-        elif msg.get("type") == "ip_reply" and self.mode == "client":
-            self.server_ip = msg["server_ip"]
-            self.client_ip = msg["client_ip"]
-            self.link.send_message({"type": "ip_confirm"})
-            self.finalize_session()
-        else:
-            callback = self.message_callbacks.get(msg["type"], None)
-            callback(msg)
+        callback = self.message_callbacks.get(msg["type"], None)
+        callback(msg)
 
     def configuration_parameters(self):
         #  peer_pub_ip, peer_ip=None, my_ip=None
@@ -134,7 +71,8 @@ class Session(object):
             set_default_routes=(self.mode == "client" and self.config.get("set_default_gateway", True)))
 
         for addon in self.addons:
-            addon.on_session_established()
+            with ExceptionIgnoredExecution(self.logger):
+                addon.on_session_established()
 
         self.network_configured = True
 
@@ -144,47 +82,86 @@ class Session(object):
 
     def on_device_packet(self, packet):
         data = packet.payload
-        for rewriter in self.rewriters:
-            try:
-                modified = rewriter.rewrite(data)
-                if modified != None:
-                    data = modified
-            except:
-                self.logger.error(traceback.format_exc())
-                break
+
+        for rewriter in self.rewriter_callbacks:
+            with ExceptionIgnoredExecution:
+                data = rewriter(data)
 
         packet.payload = data
         self.link.send_packet(packet)
 
     def on_link_packet(self, packet):
         data = packet.payload
-        for rewriter in self.rewriters:
-            try:
-                modified = rewriter.rewrite(data)
+        for rewriter in self.rewriter_callbacks:
+            with ExceptionIgnoredExecution:
+                modified = rewriter(data)
                 if modified != None:
                     data = modified
-            except:
-                self.logger.error(traceback.format_exc())
-                break
 
         packet.payload = data
         self.device.send_packet(packet)
 
     def cleanup(self):
         for addon in self.addons:
-            addon.cleanup()
+            with ExceptionIgnoredExecution():
+                addon.cleanup()
 
         if self.network_configured:
-            self.device.restore_network(*self.configuration_parameters())
-        if self.ip_allocated:
-            self.ip_manager.release(self.server_ip)
-            self.ip_manager.release(self.client_ip)
+            with ExceptionIgnoredExecution():
+                self.device.restore_network(*self.configuration_parameters())
 
         self.device.set_packet_callback(None)
         self.link.set_packet_callback(None)
 
-        for rewriter in self.rewriters:
-            rewriter.cleanup()
+        with ExceptionIgnoredExecution():
+            self.link.cleanup()
+        with ExceptionIgnoredExecution():
+            self.device.cleanup()
 
-        self.link.cleanup()
-        self.device.cleanup()
+
+class ServerSession(Session):
+    def __init__(self, *args, **kwargs):
+        super(ServerSession, self).__init__(*args, **kwargs)
+        self.ip_allocated = False
+
+    def setup_completed(self):
+        self.add_message_callback("ip_request", self.on_ip_request)
+        self.add_message_callback("ip_confirm", self.on_ip_confirm)
+        self.ip_manager = IPAddressSpaceManager(self.config['network'])
+
+    def on_ip_request(self):
+        self.server_ip, self.client_ip = self.ip_manager.allocate(
+            ), self.ip_manager.allocate()
+        self.ip_allocated = True
+        self.link.send_message({
+            "type": "ip_reply",
+            "server_ip": self.server_ip,
+            "network":  self.config['network'],
+            "client_ip": self.client_ip,
+            })
+
+    def on_ip_confirm(self):
+        self.finalize_session()
+
+    def cleanup(self):
+        if self.ip_allocated:
+            self.ip_manager.release(self.server_ip)
+            self.ip_manager.release(self.client_ip)
+
+        super(ServerSession, self).cleanup()
+
+
+class ClientSession(Session):
+    def setup_completed(self):
+        print "A"
+        self.add_message_callback("ip_reply", self.on_ip_reply)
+        self.link.send_message({
+                "type": "ip_request"
+                })
+
+    def on_ip_reply(self, msg):
+        print "B"
+        self.server_ip = msg["server_ip"]
+        self.client_ip = msg["client_ip"]
+        self.link.send_message({"type": "ip_confirm"})
+        self.finalize_session()

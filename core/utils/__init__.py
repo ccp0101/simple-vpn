@@ -6,6 +6,8 @@ import os
 import tornado.ioloop
 
 
+logger = logging.getLogger("utils")
+
 # used for port validation. returns True if valid.
 validate_port = lambda p: isinstance(p, int) and p > 0 and p < 65535
 
@@ -42,7 +44,7 @@ def get_route(addr):
     try:
         out = subprocess.check_output(command, shell=True)
     except subprocess.CalledProcessError as e:
-        logging.warning("\"%s\" returned %d" % (command, e.returncode))
+        logger.warning("\"%s\" returned %d" % (command, e.returncode))
         return ('', '')
 
     if "darwin" in sys.platform:
@@ -56,11 +58,11 @@ def get_route(addr):
 
 def run_os_command(command, params=[], supress_error=True):
     command = command + " " + " ".join(params)
-    logging.info("executing: %s" % command)
+    logger.info("executing: %s" % command)
     try:
         subprocess.check_call(command, shell=True)
     except subprocess.CalledProcessError as e:
-        logging.warning("returned %d" % e.returncode)
+        logger.warning("returned %d" % e.returncode)
         return e.returncode
     return 0
 
@@ -92,3 +94,15 @@ def import_class(cl):
     classname = cl[d + 1: len(cl)]
     m = __import__(cl[0:d], globals(), locals(), [classname])
     return getattr(m, classname)
+
+
+class ExceptionIgnoredExecution(object):
+    def __init__(self, logger=logger):
+        super(ExceptionIgnoredExecution, self).__init__()
+        self.logger = logger
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args, **kwargs):
+        pass

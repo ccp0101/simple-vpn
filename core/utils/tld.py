@@ -4,6 +4,7 @@ import logging
 import sys
 import os
 from datetime import datetime
+import string
 
 
 TLDS_URL = "http://mxr.mozilla.org/mozilla-central/source/netwerk/dns/effective_tld_names.dat?raw=1"
@@ -30,7 +31,8 @@ def fetch_tlds(callback):
         tlds = []
         for line in body.splitlines():
             domain = line.strip().split("//")[0].split(".")[-1]
-            if domain and domain not in tlds:
+            if domain and all([letter in string.ascii_letters
+                              for letter in domain]) and domain not in tlds:
                 tlds.append(domain)
         callback(tlds)
 

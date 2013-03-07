@@ -1,4 +1,4 @@
-from .abstract import Rewriter
+from .abstract import Addon
 import logging
 import tornado.ioloop
 import sys
@@ -16,20 +16,25 @@ DNS_TIMEOUT = 60
 DNS_TIMEOUT_CLEARANCE = 10
 
 
-class NameserverRewriter(Rewriter):
-    def __init__(self, config):
-        super(NameserverRewriter, self).__init__(config)
+class NameserverRewriter(Addon):
+    def __init__(self, config, session):
+        super(NameserverRewriter, self).__init__(config, session)
         self.logger = logging.getLogger(str(self))
         self.logger.debug("created.")
         self.records = {}
-        self.periodic_callback = tornado.ioloop.PeriodicCallback(self.clear_timeout,
-            DNS_TIMEOUT_CLEARANCE * 1000)
+        self.periodic_callback = tornado.ioloop.PeriodicCallback(
+            self.clear_timeout, DNS_TIMEOUT_CLEARANCE * 1000)
         if "force_nameserver" not in self.config:
             self.config['force_nameserver'] = '8.8.8.8'
-            self.logger.warning("Using default nameserver " + self.config['force_nameserver'])
+            self.logger.warning("Using default nameserver " +
+                self.config['force_nameserver'])
 
     def __str__(self):
-        return "nameserver-rewriter(%s)" % self.config.get("force_nameserver", 'Unknown')
+        return "nameserver-rewriter(%s)" % self.config.get(
+            "force_nameserver", 'Unknown')
+
+    def on_session_established(self):
+        self.session.add_rewriter_callback(self.rewrite)
 
     def rewrite(self, pkt):
         ip = IP(pkt)
@@ -50,8 +55,8 @@ class NameserverRewriter(Rewriter):
                 self.logger.debug("found DNS answer: " + dns.summary())
                 record = self.records.get(dns.id, None)
                 if record:
-                    self.logger.debug("rewriting DNS answer: %s to %s" % (iph.src,
-                        record['dst_ip']))
+                    self.logger.debug("rewriting DNS answer: %s to %s" % (
+                        iph.src, record['dst_ip']))
                     iph.src = record['dst_ip']
                     del self.records[dns.id]
             del iph.chksum
@@ -63,7 +68,8 @@ class NameserverRewriter(Rewriter):
     def clear_timeout(self):
         for dns_id in self.records:
             record = self.records[dns_id]
-            if (record['time'] - datetime.utcnow()) > timedelta(seconds=DNS_TIMEOUT):
+            if (record['time'] - datetime.utcnow()) > timedelta(
+                seconds=DNS_TIMEOUT):
                 del self.records[dns_id]
 
     def cleanup(self):

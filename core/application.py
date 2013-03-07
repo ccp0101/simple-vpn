@@ -6,7 +6,7 @@ import json
 import tornado.ioloop
 from .utils import import_class
 from devices.tun import TUNDeviceManager
-from session import Session
+from session import ClientSession, ServerSession
 import tornado.gen
 import uuid
 from datetime import timedelta
@@ -66,16 +66,14 @@ class Application(object):
         self.link_manager.setup()
         self.device_manager.setup()
 
-        if self.mode == "client":
-            self.session_name = uuid.uuid4().hex
-        else:
-            self.session_name = None
+        self.session_name = uuid.uuid4().hex
 
         self.max_session_size = 1 if self.mode == "client" else 10
         self.add_new_session()
 
     @tornado.gen.engine
     def add_new_session(self):
+        session_cls = ClientSession if self.mode == "client" else ServerSession
         if len(self.sessions) < self.max_session_size:
             link = None
             while link is None:
@@ -84,7 +82,7 @@ class Application(object):
 
             device = yield tornado.gen.Task(self.device_manager.create)
 
-            session = Session(self.mode, self.config, device, link, name=self.session_name)
+            session = session_cls(self.mode, self.config, device, link, name=self.session_name)
             self.sessions.append(session)
             session.setup(self.session_closed)
             self.add_new_session()
